@@ -20,6 +20,7 @@ import config as app_config
 import model_capabilities as mc
 from runtime_state import app_state
 from schema_validation import SchemaValidationError, validate_request_schemas
+from tool_schema import to_gemini_schema
 from logger import stats
 
 
@@ -367,11 +368,12 @@ def create_generation_config(request: OpenAIRequest) -> Dict[str, Any]:
                         "name": func_data.get("name"),
                         "description": func_data.get("description"),
                     }
+                    # 客户端 JSON Schema 里的 oneOf / $ref / additionalProperties 等
+                    # 会让 GenerateContentConfig 在本地 pydantic 校验时就炸掉，
+                    # 这里统一收敛成 Gemini 认识的子集（详见 tool_schema.py）。
                     parameters = func_data.get("parameters")
-                    if isinstance(parameters, dict) and "$schema" in parameters:
-                        parameters = parameters.copy()
-                        del parameters["$schema"]
-                    if parameters is not None:
+                    parameters = to_gemini_schema(parameters) if isinstance(parameters, dict) else {}
+                    if parameters:
                         declaration["parameters"] = parameters
                     declaration = {k: v for k, v in declaration.items() if v is not None}
                     if declaration.get("name"):

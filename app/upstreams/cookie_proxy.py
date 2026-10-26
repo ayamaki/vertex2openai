@@ -46,6 +46,7 @@ from logger import stats
 from api_helpers import get_retry_settings
 from signature_store import SignatureRecord, SignatureState, signature_store
 from schema_validation import SchemaValidationError, validate_request_schemas
+from tool_schema import to_gemini_schema
 
 from cookie_auth import (
     build_headers,
@@ -451,7 +452,10 @@ def _build_function_declarations(tools: Any) -> tuple[list[dict], bool]:
         declaration = {"name": name}
         if fn.get("description") is not None:
             declaration["description"] = fn["description"]
-        declaration["parameters"] = _cookie_ui_schema(fn.get("parameters") or {"type": "object"})
+        # Studio 的 batchGraphql 同样只吃 Gemini Schema 子集：先收敛 oneOf/$ref 等
+        # 客户端关键字，再转成控制台 UI 的形态（类型大写、properties 变 [{key,value}]）。
+        declaration["parameters"] = _cookie_ui_schema(
+            to_gemini_schema(fn.get("parameters") or {"type": "object"}) or {"type": "object"})
         declarations.append(declaration)
     return declarations, builtin_search
 
